@@ -1,0 +1,114 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Qubit Foundation",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/qubit-foundation"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://github.com/qubit-foundation/qubit-energy-schemas"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Schemas",
+      "icon": "database",
+      "url": "https://github.com/qubit-foundation/qubit-energy-schemas"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://github.com/qubit-foundation/qubit-energy-schemas/discussions"
+    },
+    {
+      "name": "Blog",
+      "icon": "newspaper",
+      "url": "https://blog.qubit.energy"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "architecture"
+      ]
+    },
+    {
+      "group": "Layer 1: Data",
+      "pages": [
+        "layer-1/overview",
+        "layer-1/schemas",
+        "layer-1/connectors",
+        "layer-1/adapters",
+        "layer-1/getting-started"
+      ]
+    },
+    {
+      "group": "Layer 2: Prediction",
+      "pages": [
+        "layer-2/overview"
+      ]
+    },
+    {
+      "group": "Layer 3: Optimization",
+      "pages": [
+        "layer-3/overview"
+      ]
+    },
+    {
+      "group": "Layer 4: Coordination",
+      "pages": [
+        "layer-4/overview"
+      ]
+    },
+    {
+      "group": "Layer 5: Settlement",
+      "pages": [
+        "layer-5/overview"
+      ]
+    },
+    {
+      "group": "Layer 6: Interface",
+      "pages": [
+        "layer-6/overview"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/qubit-foundation",
+    "linkedin": "https://www.linkedin.com/company/qubit-energy"
+  },
+  "analytics": {
+    "gtm": {
+      "tagId": "GTM-XXXXXX"
+    }
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  }
+}

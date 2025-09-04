@@ -1,0 +1,420 @@
+---
+title: Schemas
+description: Universal JSON Schema definitions for energy data interchange
+---
+
+# Qubit Energy Schemas
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Schema Version](https://img.shields.io/badge/version-v0.2.0-blue.svg)](https://github.com/qubit-foundation/qubit-energy-schemas/releases)
+
+Open-source JSON Schema definitions for energy data interchange. Built by the energy community, for the energy community.
+
+## Vision
+
+Creating a universal, open standard for energy data that enables seamless integration between energy assets, monitoring systems, and optimization platforms. Our schemas provide a common language for the energy transition.
+
+## Core Schemas
+
+### Foundation Schemas
+
+<CardGroup cols={2}>
+  <Card title="Organization" icon="building">
+    Energy company, utility, or entity managing energy assets
+  </Card>
+  <Card title="Site" icon="map-pin">
+    Physical location containing energy assets (solar farm, charging station)
+  </Card>
+  <Card title="Asset" icon="solar-panel">
+    Physical energy equipment (solar panels, batteries, inverters)
+  </Card>
+  <Card title="Meter" icon="gauge">
+    Energy measurement devices providing consumption/generation data
+  </Card>
+  <Card title="Sensor" icon="wifi">
+    Environmental or operational sensors (weather, temperature, vibration)
+  </Card>
+  <Card title="TimeSeries" icon="chart-line">
+    Time-stamped measurements and telemetry data
+  </Card>
+</CardGroup>
+
+### Advanced Schemas (v0.2)
+
+<CardGroup cols={2}>
+  <Card title="Tariff" icon="dollar-sign">
+    Dynamic pricing with carbon intensity, P2P trading, V2G rates
+  </Card>
+  <Card title="Event" icon="bell">
+    VPP dispatches, blockchain verification, AI anomaly detection
+  </Card>
+  <Card title="Weather Observation" icon="cloud-sun">
+    Hyperlocal weather with satellite, drone, and AI-enhanced data
+  </Card>
+  <Card title="Demand Response" icon="signal">
+    ML baselines, V2G coordination, flexibility market participation
+  </Card>
+  <Card title="Alarm" icon="triangle-exclamation">
+    Predictive maintenance alerts and cybersecurity threat detection
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the schemas repository
+git clone https://github.com/qubit-foundation/qubit-energy-schemas.git
+cd qubit-energy-schemas
+
+# Install validation dependencies
+pip install -r requirements.txt
+```
+
+### Validate Example Data
+
+```bash
+python scripts/validate.py examples/site.json
+```
+
+### Use in Your Project
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import json
+    from jsonschema import validate
+
+    # Load schema
+    with open('schemas/v0.2/site.json') as f:
+        schema = json.load(f)
+
+    # Your data
+    site_data = {
+        "id": "sit_solar_farm_001",
+        "name": "North Solar Farm",
+        "organization_id": "org_acme_energy",
+        "location": {
+            "latitude": 37.7749,
+            "longitude": -122.4194,
+            "timezone": "America/Los_Angeles"
+        }
+    }
+
+    # Validate
+    validate(instance=site_data, schema=schema)
+    print("✅ Data is valid!")
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const Ajv = require('ajv');
+    const fs = require('fs');
+
+    // Load schema
+    const schema = JSON.parse(fs.readFileSync('schemas/v0.2/timeseries.json'));
+    const ajv = new Ajv();
+    const validate = ajv.compile(schema);
+
+    // Your data
+    const timeseriesData = {
+      "id": "ts_solar_001_2024_01_15_14_30",
+      "asset_id": "ast_solar_inverter_001",
+      "metric": "energy_generation",
+      "value": 2500.0,
+      "unit": "kWh",
+      "timestamp": "2024-01-15T14:30:00Z"
+    };
+
+    // Validate
+    const valid = validate(timeseriesData);
+    if (!valid) console.log(validate.errors);
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    package main
+
+    import (
+        "encoding/json"
+        "github.com/xeipuuv/gojsonschema"
+    )
+
+    func validateTimeSeries(data []byte) error {
+        schemaLoader := gojsonschema.NewReferenceLoader("file:///schemas/v0.2/timeseries.json")
+        documentLoader := gojsonschema.NewBytesLoader(data)
+        
+        result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+        if err != nil {
+            return err
+        }
+        
+        if !result.Valid() {
+            return fmt.Errorf("validation failed: %v", result.Errors())
+        }
+        
+        return nil
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Schema Examples
+
+### TimeSeries Schema
+
+The most commonly used schema for real-time energy data:
+
+```json
+{
+  "id": "ts_solar_farm_001_2024_01_15_14_30",
+  "asset_id": "ast_solar_farm_001",
+  "metric": "energy_generation",
+  "value": 2500.0,
+  "unit": "kWh",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "quality": "good",
+  "metadata": {
+    "weather_condition": "sunny",
+    "panel_temperature": 35.2,
+    "inverter_efficiency": 0.98
+  }
+}
+```
+
+### Asset Schema
+
+Defines physical energy equipment:
+
+```json
+{
+  "id": "ast_battery_storage_001",
+  "name": "Tesla Megapack 2XL",
+  "site_id": "sit_energy_storage_facility",
+  "type": "battery_storage",
+  "specifications": {
+    "capacity_kwh": 3916,
+    "max_charge_rate_kw": 1890,
+    "max_discharge_rate_kw": 1890,
+    "efficiency": 0.89,
+    "chemistry": "lithium_iron_phosphate"
+  },
+  "installation": {
+    "commissioned_date": "2024-01-15",
+    "warranty_years": 20,
+    "installer": "Tesla Energy"
+  }
+}
+```
+
+## Key Features
+
+<Tabs>
+  <Tab title="Standardization">
+    <AccordionGroup>
+      <Accordion title="Consistent Identifiers">
+        - **Organizations**: `org_` prefix (e.g., `org_pacific_gas_electric`)
+        - **Sites**: `sit_` prefix (e.g., `sit_solar_farm_001`)
+        - **Assets**: `ast_` prefix (e.g., `ast_inverter_001`)
+        - **Meters**: `mtr_` prefix (e.g., `mtr_main_001`)
+        - **Sensors**: `sns_` prefix (e.g., `sns_temperature_001`)
+        - **TimeSeries**: `ts_` prefix (e.g., `ts_generation_001`)
+      </Accordion>
+      
+      <Accordion title="UTC Timestamps">
+        All timestamps use ISO 8601 UTC format: `2024-01-15T14:30:00Z`
+      </Accordion>
+      
+      <Accordion title="SI Units">
+        Standardized on International System of Units (kWh, kW, °C, m/s, etc.)
+      </Accordion>
+    </AccordionGroup>
+  </Tab>
+  
+  <Tab title="Advanced Features">
+    <AccordionGroup>
+      <Accordion title="Blockchain Integration">
+        - Smart contract addresses and transaction hashes
+        - Cryptographic verification fields
+        - Token-based settlement integration
+      </Accordion>
+      
+      <Accordion title="AI/ML Enhancement">
+        - Predictive maintenance indicators
+        - Anomaly detection confidence scores
+        - ML model metadata and versioning
+      </Accordion>
+      
+      <Accordion title="Real-time Pricing">
+        - Dynamic tariff structures
+        - Carbon intensity tracking
+        - Grid congestion pricing
+      </Accordion>
+    </AccordionGroup>
+  </Tab>
+  
+  <Tab title="Quality & Reliability">
+    <AccordionGroup>
+      <Accordion title="Data Quality">
+        - Quality indicators: `good`, `questionable`, `poor`
+        - Confidence scores for AI-generated data
+        - Data source provenance tracking
+      </Accordion>
+      
+      <Accordion title="Extensibility">
+        - `metadata` objects for custom fields
+        - Backward-compatible versioning
+        - Plugin architecture for domain-specific extensions
+      </Accordion>
+      
+      <Accordion title="Validation">
+        - Comprehensive JSON Schema validation
+        - Automated testing with 1000+ example records
+        - CI/CD integration with validation workflows
+      </Accordion>
+    </AccordionGroup>
+  </Tab>
+</Tabs>
+
+## Schema Versions
+
+<Tip>
+Always specify which schema version you're using. Version 0.2 includes significant enhancements for blockchain, AI, and advanced energy markets.
+</Tip>
+
+### Version 0.2 (Current)
+- Advanced tariff structures with dynamic pricing
+- Blockchain and smart contract integration
+- AI/ML metadata and confidence scoring
+- V2G and bidirectional energy flow support
+- Enhanced cybersecurity and threat detection
+
+### Version 0.1 (Legacy)
+- Foundation schemas for basic energy data
+- Simple tariff structures
+- Core asset and measurement definitions
+
+## Validation Tools
+
+<CodeGroup>
+
+```bash Validate Single File
+python scripts/validate.py examples/timeseries.json
+```
+
+```bash Validate All Examples
+python scripts/validate.py examples/
+```
+
+```bash Generate Types
+python scripts/generate_types.py --output types/
+```
+
+</CodeGroup>
+
+## Contributing
+
+<Steps>
+  <Step title="Fork Repository">
+    Fork the [schemas repository](https://github.com/qubit-foundation/qubit-energy-schemas)
+  </Step>
+  <Step title="Create Branch">
+    ```bash
+    git checkout -b feature/new-schema-enhancement
+    ```
+  </Step>
+  <Step title="Make Changes">
+    - Add or modify schema files in `schemas/v0.2/`
+    - Include example data in `examples/`
+    - Update documentation
+  </Step>
+  <Step title="Validate">
+    ```bash
+    python scripts/validate.py
+    pytest tests/
+    ```
+  </Step>
+  <Step title="Submit PR">
+    Create a pull request with detailed description of changes
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Warning>
+Always validate your data against the schemas before sending to production systems. Invalid data can cause downstream processing failures.
+</Warning>
+
+### Schema Design Guidelines
+
+1. **Minimize Breaking Changes**: Use optional fields for new features
+2. **Clear Naming**: Use descriptive, unambiguous field names  
+3. **Consistent Units**: Always specify units explicitly
+4. **Rich Metadata**: Include context and provenance information
+5. **Future-Proof**: Design for extensibility and evolution
+
+### Implementation Tips
+
+<CardGroup cols={2}>
+  <Card title="Performance">
+    Cache compiled schemas for repeated validation to improve throughput
+  </Card>
+  <Card title="Error Handling">
+    Provide meaningful error messages when validation fails
+  </Card>
+  <Card title="Monitoring">
+    Track validation success rates and common error patterns
+  </Card>
+  <Card title="Versioning">
+    Support multiple schema versions during migration periods
+  </Card>
+</CardGroup>
+
+## Real-World Examples
+
+### Solar Farm Monitoring
+
+```json
+{
+  "id": "ts_solar_generation_2024_01_15_14_30",
+  "asset_id": "ast_solar_array_001",
+  "metric": "energy_generation",
+  "value": 1250.5,
+  "unit": "kWh",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "quality": "good",
+  "metadata": {
+    "irradiance_wm2": 850,
+    "ambient_temp_c": 25.3,
+    "panel_temp_c": 45.1,
+    "inverter_efficiency": 0.976
+  }
+}
+```
+
+### EV Charging Session
+
+```json
+{
+  "id": "ts_charging_power_2024_01_15_15_45",
+  "asset_id": "ast_fast_charger_001",
+  "metric": "charging_power",
+  "value": 150.0,
+  "unit": "kW",
+  "timestamp": "2024-01-15T15:45:00Z",
+  "quality": "good",
+  "metadata": {
+    "session_id": "ses_charge_001",
+    "vehicle_id": "veh_tesla_model_s_001",
+    "soc_percent": 65,
+    "charging_curve": "fast"
+  }
+}
+```
+
+---
+
+*The Qubit Energy Schemas provide the data foundation that enables interoperability across the entire energy ecosystem. By establishing universal standards, we accelerate the development and deployment of innovative energy solutions.*
