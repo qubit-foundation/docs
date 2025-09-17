@@ -1,0 +1,571 @@
+---
+title: Getting Started
+description: Install and run your first energy forecast in 5 minutes
+---
+
+# Getting Started with Layer 2 Forecasting
+
+Get energy predictions running in just a few minutes with Qubit's AI-powered forecasting models. This guide walks you through installation, setup, and generating your first forecasts.
+
+## Installation
+
+<Steps>
+  <Step title="Install the Package">
+    ```bash
+    pip install qubit-energy-forecasting
+    
+    # Or with specific ML backends
+    pip install qubit-energy-forecasting[all]  # All models
+    pip install qubit-energy-forecasting[deep]  # TensorFlow/Keras
+    pip install qubit-energy-forecasting[prophet]  # Facebook Prophet
+    ```
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```python
+    import qubit.forecasting
+    print(f"Qubit Forecasting v{qubit.forecasting.__version__}")
+    
+    # Check available models
+    from qubit.forecasting import SolarForecaster, DemandForecaster
+    print("✅ Installation successful!")
+    ```
+  </Step>
+</Steps>
+
+## Quick Examples
+
+### Solar Generation Forecast
+
+Generate a 24-hour solar generation forecast:
+
+<CodeGroup>
+```python Solar Forecast Example
+from qubit.forecasting import SolarForecaster
+import pandas as pd
+import numpy as np
+
+# 1. Create sample historical data
+dates = pd.date_range('2024-01-01', periods=720, freq='1H')
+np.random.seed(42)
+
+# Simulate solar generation pattern
+hours = dates.hour
+seasonal_factor = 0.8 + 0.4 * np.sin(2 * np.pi * dates.dayofyear / 365)
+daily_pattern = np.where(
+    (hours >= 6) & (hours <= 18),
+    1000 * np.exp(-((hours - 12) ** 2) / 18),
+    0
+)
+
+historical_data = pd.DataFrame({
+    'irradiance': daily_pattern * seasonal_factor + np.random.normal(0, 50, len(dates)),
+    'temperature': 25 + np.random.normal(0, 5, len(dates)),
+    'cloud_cover': np.random.beta(2, 5, len(dates)),
+    'generation': daily_pattern * seasonal_factor * 0.18 + np.random.normal(0, 10, len(dates))
+}, index=dates)
+
+historical_data = historical_data.clip(lower=0)
+
+# 2. Initialize and train forecaster
+forecaster = SolarForecaster(
+    system_capacity_kw=1000,
+    panel_type="polycrystalline",
+    tilt_angle=35
+)
+
+# Prepare features and target
+X = historical_data[['irradiance', 'temperature', 'cloud_cover']]
+y = historical_data['generation']
+
+# Train the model
+forecaster.fit(X, y)
+print("✅ Model trained successfully!")
+
+# 3. Generate forecast
+# Create future weather forecast (normally from weather API)
+future_weather = pd.DataFrame({
+    'irradiance': [800, 850, 900, 950, 1000, 950, 900, 800, 600, 300, 0, 0,
+                   0, 0, 0, 0, 0, 0, 200, 600, 850, 950, 900, 800],
+    'temperature': [20, 22, 25, 27, 30, 32, 30, 28, 25, 22, 18, 15,
+                   12, 10, 10, 12, 15, 18, 20, 22, 25, 27, 25, 22],
+    'cloud_cover': [0.2] * 24
+}, index=pd.date_range(dates[-1] + pd.Timedelta(hours=1), periods=24, freq='1H'))
+
+forecast = forecaster.predict(
+    X.tail(24),  # Last 24 hours for context
+    horizon="24h",
+    weather_forecast=future_weather,
+    confidence_levels=[0.80, 0.95],
+    asset_id="solar_farm_001"
+)
+
+print(f"🌞 24-hour Solar Forecast Generated!")
+print(f"Peak generation: {forecast.peak_value:.2f} kW at {forecast.peak_time.strftime('%H:%M')}")
+print(f"Total energy: {forecast.total:.2f} kWh")
+print(f"Confidence: 80% interval [{forecast.confidence_intervals[0.8][0].max():.0f}, {forecast.confidence_intervals[0.8][1].max():.0f}] kW")
+```
+
+```python View Results
+# 4. Analyze the forecast
+forecast_df = forecast.to_dataframe()
+print("\n📊 Hourly Forecast:")
+print(forecast_df[['timestamp', 'forecast', 'lower_80', 'upper_80']].head(12))
+
+# Feature importance
+importance = forecaster.get_feature_importance()
+print("\n🔍 Top Features:")
+print(importance.head(5))
+
+# Export to Qubit TimeSeries format
+timeseries_data = forecast.to_timeseries()
+print(f"\n💾 Exported {len(timeseries_data)} TimeSeries records")
+print("Sample record:", timeseries_data[0])
+```
+
+```python Plot Results (Optional)
+import matplotlib.pyplot as plt
+
+# Plot the forecast
+fig, ax = plt.subplots(figsize=(12, 6))
+
+ax.plot(forecast_df['timestamp'], forecast_df['forecast'], 
+        label='Forecast', linewidth=2, color='red')
+ax.fill_between(forecast_df['timestamp'],
+                forecast_df['lower_80'], forecast_df['upper_80'],
+                alpha=0.3, color='red', label='80% Confidence')
+
+ax.set_title('24-Hour Solar Generation Forecast')
+ax.set_xlabel('Time')
+ax.set_ylabel('Generation (kW)')
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig('solar_forecast.png')
+plt.show()
+```
+</CodeGroup>
+
+### Demand Forecast
+
+Generate electricity demand predictions:
+
+<CodeGroup>
+```python Demand Forecast Example
+from qubit.forecasting import DemandForecaster
+import pandas as pd
+import numpy as np
+
+# 1. Create sample load data
+dates = pd.date_range('2024-01-01', periods=720, freq='1H')
+np.random.seed(42)
+
+# Simulate demand patterns
+hours = dates.hour
+weekday_pattern = 50 + 30 * (
+    ((hours >= 7) & (hours <= 9)) |  # Morning peak
+    ((hours >= 17) & (hours <= 21))  # Evening peak
+).astype(int)
+
+weekend_pattern = 40 + 10 * np.sin(2 * np.pi * hours / 24)
+is_weekend = dates.dayofweek >= 5
+
+base_load = np.where(is_weekend, weekend_pattern, weekday_pattern)
+temperature_effect = 2 * (25 - np.abs(dates.hour - 12)) # Temperature effect
+
+historical_load = pd.DataFrame({
+    'temperature': 20 + 10 * np.sin(2 * np.pi * dates.dayofyear / 365) + np.random.normal(0, 2, len(dates)),
+    'load': base_load + temperature_effect + np.random.normal(0, 5, len(dates))
+}, index=dates)
+
+historical_load['load'] = historical_load['load'].clip(lower=0)
+
+# 2. Initialize and train demand forecaster
+demand_forecaster = DemandForecaster(
+    customer_type="mixed",
+    include_weather=True,
+    include_calendar=True
+)
+
+# Prepare data
+X_demand = historical_load[['temperature']]
+y_demand = historical_load['load']
+
+# Train model
+demand_forecaster.fit(X_demand, y_demand)
+print("✅ Demand model trained successfully!")
+
+# 3. Generate demand forecast
+future_temp = pd.DataFrame({
+    'temperature': 22 + 3 * np.sin(2 * np.pi * np.arange(24) / 24) + np.random.normal(0, 1, 24)
+}, index=pd.date_range(dates[-1] + pd.Timedelta(hours=1), periods=24, freq='1H'))
+
+demand_forecast = demand_forecaster.predict(
+    X_demand.tail(24),
+    horizon="24h",
+    temperature_forecast=future_temp,
+    asset_id="load_mixed_001"
+)
+
+print(f"⚡ 24-hour Demand Forecast Generated!")
+print(f"Peak demand: {demand_forecast.peak_value:.2f} kW at {demand_forecast.peak_time.strftime('%H:%M')}")
+print(f"Average demand: {demand_forecast.point_forecast.mean():.2f} kW")
+
+# Peak metrics
+peak_metrics = demand_forecaster.calculate_peak_metrics(demand_forecast)
+print(f"Load factor: {peak_metrics['load_factor']:.2%}")
+```
+</CodeGroup>
+
+## Integration with Layer 1
+
+Layer 2 is designed to work seamlessly with Layer 1 data:
+
+<CodeGroup>
+```python Layer 1 Integration
+from qubit.connectors.mqtt import MQTTConnector
+from qubit.forecasting import SolarForecaster
+from qubit.adapters import AdapterPipeline
+
+# 1. Set up Layer 1 data pipeline
+connector = MQTTConnector({
+    "broker": "mqtt://your-broker.com:1883",
+    "topics": ["solar/+/telemetry"]
+})
+
+adapter_pipeline = AdapterPipeline([
+    ("units", UnitConverter()),
+    ("timezone", TimezoneAdapter()),
+    ("validation", SchemaValidator("timeseries"))
+])
+
+# 2. Initialize forecaster
+forecaster = SolarForecaster(system_capacity_kw=1000)
+
+# 3. Process real-time data and forecast
+@connector.on_message
+async def process_and_forecast(mqtt_message):
+    # Layer 1: Normalize data
+    timeseries = adapter_pipeline.process(mqtt_message)
+    
+    # Layer 2: Generate forecast when enough data
+    if len(historical_buffer) > 168:  # 1 week of data
+        forecast = forecaster.predict(
+            historical_buffer.tail(24),
+            horizon="24h"
+        )
+        
+        # Send forecast to Layer 3 or storage
+        await send_to_layer3(forecast.to_timeseries())
+
+await connector.start()
+```
+
+```python Batch Processing
+from qubit.forecasting import SolarForecaster
+import pandas as pd
+
+# Process historical TimeSeries data
+def batch_forecast(timeseries_file: str):
+    # Load Layer 1 TimeSeries data
+    df = pd.read_csv(timeseries_file)
+    
+    # Filter for solar generation data
+    solar_data = df[df['metric'] == 'energy_generation']
+    
+    # Group by asset
+    forecasts = []
+    for asset_id, asset_data in solar_data.groupby('asset_id'):
+        forecaster = SolarForecaster(system_capacity_kw=1000)
+        
+        # Prepare features from TimeSeries data
+        features = pd.DataFrame({
+            'generation': asset_data['value'].values
+        }, index=pd.to_datetime(asset_data['timestamp']))
+        
+        # Simple forecast without weather data
+        if len(features) > 168:  # Need minimum data
+            forecast = forecaster.predict(
+                features.tail(24),
+                horizon="24h",
+                asset_id=asset_id
+            )
+            forecasts.append(forecast)
+    
+    return forecasts
+
+# Process batch
+forecasts = batch_forecast('energy_timeseries.csv')
+print(f"Generated {len(forecasts)} forecasts")
+```
+</CodeGroup>
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Optional configuration
+export QUBIT_FORECASTING_CACHE_DIR="/tmp/qubit_models"
+export QUBIT_FORECASTING_LOG_LEVEL="INFO"
+export QUBIT_FORECASTING_PARALLEL_JOBS="4"
+```
+
+### Configuration File
+
+<CodeGroup>
+```yaml config.yaml
+forecasting:
+  default_horizon: "24h"
+  default_resolution: "1h"
+  cache_models: true
+  
+models:
+  solar:
+    default_capacity: 1000  # kW
+    include_weather: true
+    confidence_levels: [0.8, 0.95]
+    
+  demand:
+    customer_segments: ["residential", "commercial", "industrial"]
+    include_calendar: true
+    
+performance:
+  batch_size: 32
+  n_jobs: -1
+  memory_limit: "4GB"
+```
+
+```python Load Configuration
+from qubit.forecasting.config import load_config
+
+config = load_config('config.yaml')
+forecaster = SolarForecaster.from_config(config['models']['solar'])
+```
+</CodeGroup>
+
+## Docker Deployment
+
+Run forecasting models in containers:
+
+<CodeGroup>
+```dockerfile Dockerfile
+FROM python:3.9-slim
+
+# Install forecasting package
+RUN pip install qubit-energy-forecasting[all]
+
+# Copy your forecasting script
+COPY forecast_app.py /app/
+WORKDIR /app
+
+# Run the forecasting service
+CMD ["python", "forecast_app.py"]
+```
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  solar-forecaster:
+    build: .
+    environment:
+      - FORECASTING_MODEL=solar
+      - HORIZON=24h
+      - RESOLUTION=1h
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    ports:
+      - "8080:8080"
+
+  demand-forecaster:
+    build: .
+    environment:
+      - FORECASTING_MODEL=demand
+      - CUSTOMER_TYPE=mixed
+    volumes:
+      - ./data:/app/data
+```
+
+```bash Deploy
+# Build and run
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs solar-forecaster
+```
+</CodeGroup>
+
+## API Server
+
+Deploy forecasting as a REST API:
+
+<CodeGroup>
+```python api_server.py
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from qubit.forecasting import SolarForecaster, DemandForecaster
+import pandas as pd
+
+app = FastAPI(title="Qubit Energy Forecasting API")
+
+# Initialize models
+solar_forecaster = SolarForecaster(system_capacity_kw=1000)
+demand_forecaster = DemandForecaster(customer_type="mixed")
+
+class ForecastRequest(BaseModel):
+    asset_id: str
+    model_type: str  # "solar" or "demand"
+    horizon: str = "24h"
+    historical_data: dict
+    weather_data: dict = None
+
+@app.post("/forecast")
+async def generate_forecast(request: ForecastRequest):
+    try:
+        if request.model_type == "solar":
+            forecaster = solar_forecaster
+        elif request.model_type == "demand":
+            forecaster = demand_forecaster
+        else:
+            raise HTTPException(400, "Invalid model_type")
+        
+        # Convert data to DataFrame
+        X = pd.DataFrame(request.historical_data)
+        
+        # Generate forecast
+        forecast = forecaster.predict(
+            X,
+            horizon=request.horizon,
+            asset_id=request.asset_id
+        )
+        
+        return {
+            "asset_id": forecast.asset_id,
+            "forecast": forecast.point_forecast.tolist(),
+            "timestamps": forecast.timestamps.isoformat().tolist(),
+            "peak_value": forecast.peak_value,
+            "total": forecast.total
+        }
+    
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
+```
+
+```bash Start API Server
+# Install dependencies
+pip install fastapi uvicorn
+
+# Run server
+python api_server.py
+
+# Test API
+curl -X POST "http://localhost:8080/forecast" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_id": "solar_001",
+    "model_type": "solar",
+    "horizon": "24h",
+    "historical_data": {"generation": [100, 200, 300]}
+  }'
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Import Errors">
+    ```bash
+    # Missing dependencies
+    pip install --upgrade qubit-energy-forecasting[all]
+    
+    # Python version issues
+    python --version  # Requires 3.9+
+    
+    # Virtual environment
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    venv\Scripts\activate     # Windows
+    pip install qubit-energy-forecasting
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory Issues">
+    ```python
+    # Reduce batch size
+    forecaster = XGBoostForecaster(
+        batch_size=16,  # Reduce from default 32
+        n_jobs=2        # Limit parallel jobs
+    )
+    
+    # Clear model cache
+    forecaster.clear_cache()
+    
+    # Use lighter models
+    forecaster = ARIMAForecaster()  # Instead of LSTM
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Issues">
+    ```python
+    # Enable model caching
+    forecaster.cache_model = True
+    
+    # Pre-compute features
+    features = feature_engineer.extract(data)
+    forecaster.fit(features, target, cache_features=True)
+    
+    # Use ensemble weights
+    ensemble.optimize_weights(X_train, y_train, method='fast')
+    ```
+  </Accordion>
+  
+  <Accordion title="Data Quality Issues">
+    ```python
+    # Validate input data
+    from qubit.forecasting.validation import validate_timeseries
+    
+    errors = validate_timeseries(data)
+    if errors:
+        print("Data validation errors:", errors)
+    
+    # Handle missing values
+    data_cleaned = data.fillna(method='ffill').fillna(method='bfill')
+    
+    # Remove outliers
+    from qubit.forecasting.preprocessing import remove_outliers
+    data_clean = remove_outliers(data, method='iqr', threshold=3)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore Models" icon="brain" href="/layer-2/forecasting">
+    Learn about different forecasting algorithms and when to use them
+  </Card>
+  <Card title="Production Deployment" icon="server">
+    Deploy forecasting models at scale with Kubernetes and monitoring
+  </Card>
+  <Card title="GitHub Examples" icon="github" href="https://github.com/qubit-foundation/qubit-energy-forecasting/tree/main/examples">
+    Browse complete example applications and use cases
+  </Card>
+  <Card title="Layer 3 Integration" icon="arrows-right" href="/layer-3/overview">
+    Use forecasts for energy system optimization
+  </Card>
+</CardGroup>
+
+---
+
+*You're now ready to generate production-quality energy forecasts! Layer 2 provides the predictions that power intelligent energy optimization in Layer 3.*

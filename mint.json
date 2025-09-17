@@ -69,7 +69,9 @@
     {
       "group": "Layer 2: Prediction",
       "pages": [
-        "layer-2/overview"
+        "layer-2/overview",
+        "layer-2/forecasting",
+        "layer-2/getting-started"
       ]
     },
     {

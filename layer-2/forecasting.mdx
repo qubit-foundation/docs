@@ -1,0 +1,712 @@
+---
+title: Forecasting Models
+description: Deep dive into AI-powered energy forecasting models and algorithms
+---
+
+# Energy Forecasting Models
+
+Layer 2 provides state-of-the-art machine learning models specifically designed for energy domain challenges. Each model is optimized for different forecasting horizons, data patterns, and accuracy requirements.
+
+## Model Categories
+
+<CardGroup cols={2}>
+  <Card title="Time Series Models" icon="chart-line">
+    Classical and modern approaches for temporal pattern recognition
+  </Card>
+  <Card title="Weather-Based Models" icon="cloud-sun">
+    Renewable generation forecasting with meteorological data
+  </Card>
+  <Card title="Behavioral Models" icon="users">
+    Demand forecasting incorporating human behavior patterns
+  </Card>
+  <Card title="Ensemble Methods" icon="layer-group">
+    Combining multiple models for optimal accuracy
+  </Card>
+</CardGroup>
+
+## Available Models
+
+### Classical Time Series
+
+<Tabs>
+  <Tab title="ARIMA">
+    **Auto-Regressive Integrated Moving Average**
+    
+    Best for: Stable patterns, linear trends, short-term forecasting
+    
+    ```python
+    from qubit.forecasting.models import ARIMAForecaster
+    
+    forecaster = ARIMAForecaster(
+        order=(2, 1, 2),  # (p, d, q)
+        seasonal_order=(1, 1, 1, 24),  # Daily seasonality
+        auto_select=True  # Automatic parameter selection
+    )
+    
+    forecaster.fit(historical_data)
+    forecast = forecaster.predict(horizon="24h")
+    ```
+    
+    **Strengths:**
+    - Fast training and inference
+    - Interpretable parameters
+    - Confidence intervals included
+    - Good for stable seasonal patterns
+    
+    **Limitations:**
+    - Assumes linear relationships
+    - Limited external feature support
+    - Poor with non-stationary data
+  </Tab>
+  
+  <Tab title="Prophet">
+    **Facebook Prophet**
+    
+    Best for: Seasonal data, holiday effects, trend changes
+    
+    ```python
+    from qubit.forecasting.models import ProphetForecaster
+    
+    forecaster = ProphetForecaster(
+        yearly_seasonality=True,
+        weekly_seasonality=True,
+        daily_seasonality=True,
+        holidays=['US'],  # Built-in holiday calendar
+        changepoint_prior_scale=0.05
+    )
+    
+    # Automatic feature engineering
+    forecaster.fit(energy_data)
+    forecast = forecaster.predict(
+        horizon="7d",
+        include_history=False
+    )
+    ```
+    
+    **Strengths:**
+    - Handles missing data gracefully
+    - Automatic holiday detection
+    - Robust to outliers
+    - Interpretable trend/seasonality decomposition
+    
+    **Best Use Cases:**
+    - Load forecasting with strong seasonal patterns
+    - Long-term capacity planning
+    - Data with irregular patterns
+  </Tab>
+  
+  <Tab title="Exponential Smoothing">
+    **Holt-Winters and ETS Models**
+    
+    Best for: Simple seasonality, fast deployment
+    
+    ```python
+    from qubit.forecasting.models import ExponentialSmoothingForecaster
+    
+    forecaster = ExponentialSmoothingForecaster(
+        trend='add',
+        seasonal='add',
+        seasonal_periods=24,  # Hourly seasonality
+        damped_trend=True
+    )
+    
+    forecaster.fit(load_history)
+    forecast = forecaster.predict(horizon="48h")
+    ```
+  </Tab>
+</Tabs>
+
+### Machine Learning Models
+
+<Tabs>
+  <Tab title="Random Forest">
+    **Ensemble of Decision Trees**
+    
+    Best for: Feature-rich data, non-linear patterns, uncertainty quantification
+    
+    ```python
+    from qubit.forecasting.models import RandomForestForecaster
+    
+    forecaster = RandomForestForecaster(
+        n_estimators=100,
+        max_depth=15,
+        min_samples_split=5,
+        bootstrap=True
+    )
+    
+    # Include weather and calendar features
+    features = feature_engineer.extract(
+        energy_data,
+        include_weather=True,
+        include_calendar=True,
+        include_lag=True
+    )
+    
+    forecaster.fit(features, target_values)
+    forecast = forecaster.predict(future_features)
+    ```
+    
+    **Feature Importance Analysis:**
+    ```python
+    importance = forecaster.get_feature_importance()
+    print(importance.head(10))
+    
+    # Output:
+    # temperature             0.234
+    # hour_sin               0.187
+    # load_lag_24h           0.156
+    # is_weekend             0.098
+    # cloud_cover            0.089
+    ```
+  </Tab>
+  
+  <Tab title="XGBoost">
+    **Gradient Boosting**
+    
+    Best for: High accuracy, complex feature interactions
+    
+    ```python
+    from qubit.forecasting.models import XGBoostForecaster
+    
+    forecaster = XGBoostForecaster(
+        n_estimators=200,
+        max_depth=8,
+        learning_rate=0.1,
+        subsample=0.8,
+        colsample_bytree=0.8
+    )
+    
+    # Advanced hyperparameter tuning
+    forecaster.tune_hyperparameters(
+        X_train, y_train,
+        cv_folds=5,
+        n_trials=100
+    )
+    ```
+    
+    **Quantile Regression:**
+    ```python
+    # Uncertainty quantification
+    forecast = forecaster.predict(
+        X_future,
+        quantiles=[0.1, 0.25, 0.5, 0.75, 0.9]
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Support Vector Regression">
+    **SVR with RBF Kernel**
+    
+    Best for: Non-linear patterns, small datasets
+    
+    ```python
+    from qubit.forecasting.models import SVRForecaster
+    
+    forecaster = SVRForecaster(
+        kernel='rbf',
+        C=1.0,
+        gamma='scale',
+        epsilon=0.1
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Deep Learning Models
+
+<Tabs>
+  <Tab title="LSTM Networks">
+    **Long Short-Term Memory**
+    
+    Best for: Long-term dependencies, complex temporal patterns
+    
+    ```python
+    from qubit.forecasting.models import LSTMForecaster
+    
+    forecaster = LSTMForecaster(
+        lstm_units=[128, 64],
+        dropout=0.2,
+        lookback_window=168,  # 1 week of hourly data
+        forecast_horizon=24,
+        batch_size=32,
+        epochs=100
+    )
+    
+    # Multi-step ahead prediction
+    forecaster.fit(
+        X_train, y_train,
+        validation_split=0.2,
+        early_stopping=True
+    )
+    
+    forecast = forecaster.predict(X_test)
+    ```
+    
+    **Architecture Visualization:**
+    ```python
+    forecaster.plot_model_architecture()
+    forecaster.plot_training_history()
+    ```
+    
+    **Sequence-to-Sequence Prediction:**
+    ```python
+    # Input: 7 days of hourly data
+    # Output: Next 24 hours
+    forecast = forecaster.predict_sequence(
+        input_sequence,
+        horizon=24
+    )
+    ```
+  </Tab>
+  
+  <Tab title="GRU Networks">
+    **Gated Recurrent Units**
+    
+    Best for: Faster training than LSTM, good performance
+    
+    ```python
+    from qubit.forecasting.models import GRUForecaster
+    
+    forecaster = GRUForecaster(
+        gru_units=[64, 32],
+        dropout=0.3,
+        recurrent_dropout=0.2,
+        return_sequences=True
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Transformer Models">
+    **Attention-Based Architecture**
+    
+    Best for: Very long sequences, parallel training
+    
+    ```python
+    from qubit.forecasting.models import TransformerForecaster
+    
+    forecaster = TransformerForecaster(
+        d_model=64,
+        n_heads=8,
+        n_layers=4,
+        d_ff=256,
+        max_seq_length=8760  # Full year
+    )
+    
+    # Self-attention visualization
+    attention_weights = forecaster.get_attention_weights(input_data)
+    forecaster.plot_attention_heatmap(attention_weights)
+    ```
+  </Tab>
+</Tabs>
+
+## Domain-Specific Forecasters
+
+### Solar Generation Forecasting
+
+<AccordionGroup>
+  <Accordion title="Physical Solar Model">
+    Combines physics-based solar calculations with ML corrections:
+    
+    ```python
+    from qubit.forecasting.solar import PhysicalSolarForecaster
+    
+    forecaster = PhysicalSolarForecaster(
+        system_capacity_kw=1000,
+        panel_type='monocrystalline',
+        tilt_angle=35,
+        azimuth=180,
+        location={'lat': 37.7749, 'lon': -122.4194}
+    )
+    
+    # Uses solar position algorithms + weather data
+    forecast = forecaster.predict(
+        weather_forecast,
+        include_physics=True,
+        ml_correction=True
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Cloud Motion Tracking">
+    Satellite imagery analysis for sub-hour forecasting:
+    
+    ```python
+    from qubit.forecasting.solar import CloudMotionForecaster
+    
+    forecaster = CloudMotionForecaster(
+        satellite_provider='goes_16',
+        tracking_method='optical_flow',
+        nowcasting_horizon='3h'
+    )
+    
+    # Requires satellite imagery API
+    forecast = forecaster.predict(
+        current_irradiance,
+        satellite_images=imagery_data
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="PV Performance Model">
+    System-specific performance modeling:
+    
+    ```python
+    from qubit.forecasting.solar import PVPerformanceForecaster
+    
+    forecaster = PVPerformanceForecaster(
+        pv_model='sandia',
+        inverter_model='cec',
+        degradation_rate=0.005  # Annual
+    )
+    
+    # Temperature coefficient correction
+    forecast = forecaster.predict(
+        irradiance_forecast,
+        temperature_forecast,
+        wind_forecast
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Demand & Load Forecasting
+
+<AccordionGroup>
+  <Accordion title="Customer Segmentation Models">
+    Different models for different customer types:
+    
+    ```python
+    from qubit.forecasting.demand import SegmentedDemandForecaster
+    
+    forecaster = SegmentedDemandForecaster(
+        segments={
+            'residential': ResidentialModel(),
+            'commercial': CommercialModel(),
+            'industrial': IndustrialModel()
+        }
+    )
+    
+    # Automatic customer classification
+    forecast = forecaster.predict(
+        customer_data,
+        auto_segment=True
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Price-Responsive Demand">
+    Incorporates electricity pricing effects:
+    
+    ```python
+    from qubit.forecasting.demand import PriceElasticDemandForecaster
+    
+    forecaster = PriceElasticDemandForecaster(
+        price_elasticity=-0.1,  # 10% demand reduction per 100% price increase
+        income_elasticity=0.3
+    )
+    
+    forecast = forecaster.predict(
+        historical_load,
+        price_forecast=prices_df
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Weather-Sensitive Load">
+    Temperature-dependent demand modeling:
+    
+    ```python
+    from qubit.forecasting.demand import WeatherSensitiveForecaster
+    
+    forecaster = WeatherSensitiveForecaster(
+        cooling_threshold=22,  # Celsius
+        heating_threshold=18,
+        weather_lag=1  # 1-hour temperature lag
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Wind Generation Forecasting
+
+<AccordionGroup>
+  <Accordion title="Wind Power Curve Model">
+    Physics-based wind-to-power conversion:
+    
+    ```python
+    from qubit.forecasting.wind import WindPowerForecaster
+    
+    forecaster = WindPowerForecaster(
+        turbine_type='vestas_v90',
+        hub_height=80,  # meters
+        rated_power=2000,  # kW
+        cut_in_speed=3,   # m/s
+        cut_out_speed=25  # m/s
+    )
+    
+    # Wind speed to power conversion
+    forecast = forecaster.predict(
+        wind_speed_forecast,
+        wind_direction_forecast
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Wake Effect Modeling">
+    Turbine interaction effects in wind farms:
+    
+    ```python
+    from qubit.forecasting.wind import WindFarmForecaster
+    
+    forecaster = WindFarmForecaster(
+        turbine_layout=turbine_coordinates,
+        wake_model='jensen',
+        terrain_roughness=0.1
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Ensemble Methods
+
+### Model Combination Strategies
+
+<Tabs>
+  <Tab title="Weighted Average">
+    ```python
+    from qubit.forecasting.ensemble import WeightedEnsemble
+    
+    ensemble = WeightedEnsemble([
+        ('prophet', ProphetForecaster()),
+        ('xgboost', XGBoostForecaster()),
+        ('lstm', LSTMForecaster())
+    ], weights=[0.3, 0.4, 0.3])
+    
+    # Automatic weight optimization
+    ensemble.optimize_weights(
+        X_train, y_train,
+        method='minimize_mse'
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Stacking">
+    ```python
+    from qubit.forecasting.ensemble import StackingEnsemble
+    
+    base_models = [
+        ('arima', ARIMAForecaster()),
+        ('rf', RandomForestForecaster()),
+        ('svr', SVRForecaster())
+    ]
+    
+    ensemble = StackingEnsemble(
+        base_models=base_models,
+        meta_learner=XGBoostForecaster()
+    )
+    
+    ensemble.fit(X_train, y_train)
+    forecast = ensemble.predict(X_test)
+    ```
+  </Tab>
+  
+  <Tab title="Dynamic Ensemble">
+    ```python
+    from qubit.forecasting.ensemble import DynamicEnsemble
+    
+    ensemble = DynamicEnsemble([
+        ('short_term', ARIMAForecaster()),
+        ('medium_term', ProphetForecaster()),
+        ('long_term', LSTMForecaster())
+    ])
+    
+    # Different models for different horizons
+    forecast = ensemble.predict(
+        X_test,
+        horizon_weights={
+            '1h': [0.7, 0.2, 0.1],
+            '24h': [0.3, 0.5, 0.2],
+            '7d': [0.1, 0.3, 0.6]
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Model Selection Guide
+
+<Warning>
+Choose models based on your specific use case, data characteristics, and performance requirements.
+</Warning>
+
+### Decision Matrix
+
+| Use Case | Recommended Model | Alternative | Training Time | Inference Speed |
+|----------|------------------|-------------|---------------|-----------------|
+| **Short-term load (1-4h)** | XGBoost | ARIMA | Medium | Fast |
+| **Day-ahead solar** | Ensemble | Random Forest | Slow | Medium |
+| **Week-ahead demand** | Prophet | LSTM | Fast | Fast |
+| **Real-time pricing** | ARIMA | SVR | Fast | Very Fast |
+| **Seasonal planning** | Prophet | Exponential Smoothing | Fast | Fast |
+| **Complex patterns** | LSTM | Transformer | Very Slow | Slow |
+
+### Data Requirements
+
+<CardGroup cols={2}>
+  <Card title="Small Dataset (<1000 samples)">
+    - ARIMA
+    - Exponential Smoothing
+    - SVR
+    - Simple ensemble
+  </Card>
+  <Card title="Medium Dataset (1k-10k samples)">
+    - Random Forest
+    - XGBoost
+    - Prophet
+    - Weighted ensemble
+  </Card>
+  <Card title="Large Dataset (>10k samples)">
+    - LSTM/GRU
+    - Transformer
+    - Deep ensemble
+    - Stacking ensemble
+  </Card>
+  <Card title="Very Large Dataset (>100k samples)">
+    - Distributed XGBoost
+    - Multi-GPU LSTM
+    - Transformer with attention
+    - Neural ensemble
+  </Card>
+</CardGroup>
+
+## Advanced Features
+
+### Uncertainty Quantification
+
+All models support multiple uncertainty estimation methods:
+
+```python
+# Prediction intervals
+forecast = forecaster.predict(
+    X_test,
+    confidence_levels=[0.5, 0.8, 0.95],
+    method='quantile_regression'
+)
+
+# Monte Carlo dropout (for neural networks)
+forecast = lstm_forecaster.predict(
+    X_test,
+    uncertainty_method='mc_dropout',
+    mc_samples=100
+)
+
+# Ensemble variance
+forecast = ensemble.predict(
+    X_test,
+    return_std=True,
+    return_individual_predictions=True
+)
+```
+
+### Online Learning
+
+Models that adapt to new data automatically:
+
+```python
+from qubit.forecasting.online import OnlineForecaster
+
+online_model = OnlineForecaster(
+    base_model=XGBoostForecaster(),
+    update_frequency='1h',
+    window_size=8760,  # 1 year rolling window
+    adaptation_rate=0.01
+)
+
+# Continuous learning
+for new_data_point in data_stream:
+    prediction = online_model.predict(new_data_point.features)
+    online_model.update(new_data_point.features, new_data_point.target)
+```
+
+### Multi-Horizon Forecasting
+
+Generate predictions for multiple time horizons simultaneously:
+
+```python
+from qubit.forecasting.multi import MultiHorizonForecaster
+
+forecaster = MultiHorizonForecaster(
+    horizons=['1h', '6h', '24h', '7d'],
+    models={
+        '1h': ARIMAForecaster(),
+        '6h': XGBoostForecaster(),
+        '24h': LSTMForecaster(),
+        '7d': ProphetForecaster()
+    }
+)
+
+multi_forecast = forecaster.predict(X_test)
+print(f"1-hour: {multi_forecast['1h'].peak_value:.2f} kW")
+print(f"24-hour: {multi_forecast['24h'].total:.2f} kWh")
+```
+
+## Model Evaluation
+
+### Comprehensive Metrics
+
+```python
+from qubit.forecasting.evaluation import ForecastEvaluator
+
+evaluator = ForecastEvaluator(
+    metrics=['mape', 'rmse', 'mae', 'peak_accuracy', 'energy_score']
+)
+
+results = evaluator.evaluate(
+    y_true=test_targets,
+    forecasts=model_predictions,
+    timestamps=test_timestamps
+)
+
+# Energy-specific metrics
+print(f"MAPE: {results.mape:.2%}")
+print(f"Peak timing accuracy: {results.peak_accuracy:.2%}")
+print(f"Energy score: {results.energy_score:.3f}")
+```
+
+### Cross-Validation
+
+Time series aware cross-validation:
+
+```python
+from qubit.forecasting.validation import TimeSeriesCrossValidator
+
+cv = TimeSeriesCrossValidator(
+    n_splits=5,
+    gap=24,  # 24-hour gap between train/test
+    horizon=24  # 24-hour forecast horizon
+)
+
+cv_scores = cv.cross_validate(
+    forecaster=XGBoostForecaster(),
+    X=features,
+    y=targets,
+    metrics=['mape', 'rmse']
+)
+
+print(f"CV MAPE: {cv_scores['mape'].mean():.2%} ± {cv_scores['mape'].std():.2%}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/layer-2/getting-started">
+    Build your first forecast in 5 minutes
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/qubit-foundation/qubit-energy-forecasting">
+    Explore the full source code and examples
+  </Card>
+</CardGroup>
+
+---
+
+*The forecasting models are continuously improved based on real-world deployment feedback and cutting-edge ML research.*
