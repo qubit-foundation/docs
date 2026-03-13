@@ -1,0 +1,256 @@
+---
+title: Getting Started
+description: Install and run your first energy optimization in 5 minutes
+---
+
+# Getting Started with Layer 3 Optimization
+
+Get cost-optimal energy scheduling running in minutes. This guide walks you through installation, EV charging optimization, and peak shaving with battery storage.
+
+## Installation
+
+<Steps>
+  <Step title="Install the Package">
+    ```bash
+    pip install qubit-energy-optimizer
+    ```
+  </Step>
+
+  <Step title="Verify Installation">
+    ```python
+    from optimizer.base import OptimizationConfig, OptimizationResult
+    from optimizer.ev.scheduler import EVChargingScheduler
+    from optimizer.peak_shaving.controller import PeakShavingController
+    print("Qubit Energy Optimizer installed successfully!")
+    ```
+  </Step>
+</Steps>
+
+## Quick Examples
+
+### EV Charging Schedule
+
+Optimize charging for a fleet of EVs on a time-of-use tariff:
+
+<CodeGroup>
+```python EV Charging Example
+from optimizer.ev.scheduler import EVChargingScheduler, ChargingSession
+from optimizer.base import OptimizationConfig
+from datetime import datetime, timezone
+import numpy as np
+
+# 1. Configure the scheduler
+config = OptimizationConfig(horizon="24h", resolution="1h")
+scheduler = EVChargingScheduler(
+    config=config,
+    site_capacity_kw=200.0,    # Max site power
+    charger_capacity_kw=22.0   # AC Level 2 chargers
+)
+
+# 2. Define charging sessions
+sessions = [
+    ChargingSession(
+        vehicle_id="ev_001",
+        arrival_time=datetime(2025, 1, 15, 8, 0, tzinfo=timezone.utc),
+        departure_time=datetime(2025, 1, 15, 17, 0, tzinfo=timezone.utc),
+        energy_needed_kwh=30.0,
+        max_charge_rate_kw=22.0,
+        priority=1
+    ),
+    ChargingSession(
+        vehicle_id="ev_002",
+        arrival_time=datetime(2025, 1, 15, 9, 0, tzinfo=timezone.utc),
+        departure_time=datetime(2025, 1, 15, 15, 0, tzinfo=timezone.utc),
+        energy_needed_kwh=20.0,
+        max_charge_rate_kw=22.0,
+        priority=2  # High priority — gets cheaper slots first
+    ),
+]
+
+# 3. Define tariff
+tariff = {
+    "energy_rates": [
+        {"name": "off_peak", "rate": 0.08,
+         "schedule": {"start_time": "00:00", "end_time": "06:59"}},
+        {"name": "peak", "rate": 0.25,
+         "schedule": {"start_time": "07:00", "end_time": "22:59"}},
+        {"name": "off_peak_night", "rate": 0.08,
+         "schedule": {"start_time": "23:00", "end_time": "23:59"}}
+    ]
+}
+
+# 4. Run optimization
+result = scheduler.optimize(
+    sessions=sessions,
+    tariff=tariff,
+    start_time=datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+)
+
+print(f"Status: {result.status}")
+print(f"Total cost: ${result.total_cost:.2f}")
+print(f"Total energy: {result.total_energy_kwh:.1f} kWh")
+print(f"Peak demand: {result.peak_demand_kw:.1f} kW")
+print(f"Solve time: {result.solve_time_ms:.1f} ms")
+```
+
+```python View Schedule
+# 5. Inspect the schedule
+schedule = result.schedule
+
+print("\nHourly Charging Schedule (kW):")
+print(schedule[["ev_ev_001_kw", "ev_ev_002_kw", "total_ev_kw", "price_per_kwh"]].to_string())
+
+# Check constraint satisfaction
+print("\nConstraints:")
+for name, met in result.constraints_satisfied.items():
+    print(f"  {name}: {'PASS' if met else 'FAIL'}")
+```
+</CodeGroup>
+
+### Peak Shaving with Battery
+
+Reduce demand peaks using battery storage:
+
+<CodeGroup>
+```python Peak Shaving Example
+from optimizer.peak_shaving.controller import PeakShavingController, BatterySpec
+from optimizer.base import OptimizationConfig
+from datetime import datetime, timezone
+import numpy as np
+
+# 1. Configure the controller
+config = OptimizationConfig(horizon="24h", resolution="1h")
+controller = PeakShavingController(
+    config=config,
+    peak_target_kw=150.0   # Target: keep demand below 150 kW
+)
+
+# 2. Define battery
+battery = BatterySpec(
+    asset_id="ast_batt_001",
+    capacity_kwh=200.0,
+    max_charge_kw=50.0,
+    max_discharge_kw=50.0,
+    efficiency_charge=0.95,
+    efficiency_discharge=0.95,
+    min_soc_percent=10.0,
+    max_soc_percent=90.0,
+    initial_soc_percent=50.0
+)
+
+# 3. Create load profile with peaks
+hours = np.arange(24)
+load = 80 + 100 * np.exp(-((hours - 9) ** 2) / 4) + 120 * np.exp(-((hours - 18) ** 2) / 4)
+
+# 4. Define tariff with demand charges
+tariff = {
+    "energy_rates": [
+        {"name": "off_peak", "rate": 0.08,
+         "schedule": {"start_time": "00:00", "end_time": "06:59"}},
+        {"name": "peak", "rate": 0.25,
+         "schedule": {"start_time": "07:00", "end_time": "22:59"}},
+        {"name": "off_peak_night", "rate": 0.08,
+         "schedule": {"start_time": "23:00", "end_time": "23:59"}}
+    ],
+    "demand_charges": [
+        {"name": "monthly_demand", "rate_per_kw": 15.0}
+    ]
+}
+
+# 5. Run optimization
+result = controller.optimize(
+    battery=battery,
+    load_forecast=load,
+    tariff=tariff,
+    start_time=datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+)
+
+print(f"Status: {result.status}")
+print(f"Peak before: {load.max():.1f} kW")
+print(f"Peak after: {result.peak_demand_kw:.1f} kW")
+print(f"Peak reduction: {result.constraints_satisfied['peak_reduction_kw']:.1f} kW")
+print(f"Demand charge savings: ${result.constraints_satisfied['demand_charge_savings']:.2f}")
+print(f"Battery wear cost: ${result.constraints_satisfied['battery_wear_cost']:.2f}")
+```
+
+```python View Battery Profile
+# 6. Inspect battery dispatch
+schedule = result.schedule
+
+print("\nBattery Dispatch Schedule:")
+cols = ["load_forecast_kw", "battery_charge_kw", "battery_discharge_kw",
+        "battery_soc_percent", "net_load_after_kw"]
+print(schedule[cols].to_string(float_format="%.1f"))
+```
+</CodeGroup>
+
+## Integration with Layer 2 Forecasts
+
+Use Layer 2 predictions as optimization inputs:
+
+```python
+from forecasting.solar import SolarForecaster
+from forecasting.demand import DemandForecaster
+from optimizer.peak_shaving.controller import PeakShavingController, BatterySpec
+
+# Generate forecasts (Layer 2)
+solar_forecast = solar_forecaster.predict(weather_data, horizon="24h")
+load_forecast = demand_forecaster.predict(features, horizon="24h")
+
+# Optimize battery dispatch (Layer 3)
+result = controller.optimize(
+    battery=battery,
+    load_forecast=load_forecast.point_forecast.values,
+    solar_forecast=solar_forecast.point_forecast.values,
+    tariff=tariff,
+    start_time=start_time
+)
+```
+
+## Configuration Reference
+
+### OptimizationConfig
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `horizon` | `"24h"` | Optimization window (`"24h"`, `"7d"`, etc.) |
+| `resolution` | `"15min"` | Time slot size (`"15min"`, `"1h"`) |
+| `objective` | `"minimize_cost"` | Primary objective function |
+| `max_iterations` | `1000` | Solver iteration limit |
+| `tolerance` | `1e-6` | Convergence tolerance |
+| `weights` | `{"cost": 1.0, "carbon": 0.0, "peak": 0.0}` | Multi-objective weights |
+
+### EVChargingScheduler
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `site_capacity_kw` | `200.0` | Maximum total site power draw |
+| `num_chargers` | `10` | Number of EVSE ports |
+| `charger_capacity_kw` | `22.0` | Max power per charging port |
+
+### PeakShavingController
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `peak_target_kw` | `None` | Target peak (None = auto 80th percentile) |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="EV Charging Deep Dive" icon="car" href="/layer-3/ev-scheduler">
+    Priority scheduling, carbon-aware optimization, and constraint details
+  </Card>
+  <Card title="Peak Shaving Deep Dive" icon="battery-full" href="/layer-3/peak-shaving">
+    Two-pass algorithm, SOC management, and demand charge savings
+  </Card>
+  <Card title="Layer 2 Forecasting" icon="chart-line" href="/layer-2/getting-started">
+    Generate the forecasts that feed into Layer 3
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/qubit-foundation/qubit-energy-optimizer">
+    Source code, examples, and issue tracker
+  </Card>
+</CardGroup>
+
+---
+
+*You're now ready to optimize energy schedules! Layer 3 takes forecasts from Layer 2 and tariff data from Layer 1 to produce cost-optimal dispatch decisions.*

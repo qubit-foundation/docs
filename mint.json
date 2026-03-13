@@ -77,7 +77,10 @@
     {
       "group": "Layer 3: Optimization",
       "pages": [
-        "layer-3/overview"
+        "layer-3/overview",
+        "layer-3/ev-scheduler",
+        "layer-3/peak-shaving",
+        "layer-3/getting-started"
       ]
     },
     {
