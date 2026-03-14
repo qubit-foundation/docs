@@ -1,0 +1,228 @@
+---
+title: Getting Started
+description: Install and dispatch your first optimization schedule in 5 minutes
+---
+
+# Getting Started with Layer 4 Coordination
+
+Set up command dispatch and asset coordination in minutes. This guide walks you through converting a Layer 3 optimization schedule into real device commands.
+
+## Installation
+
+<Steps>
+  <Step title="Install the Package">
+    ```bash
+    pip install qubit-energy-coordinator
+    ```
+  </Step>
+
+  <Step title="Verify Installation">
+    ```python
+    from coordinator import (
+        DispatchEngine, EventBus,
+        OCPPAdapter, ModbusAdapter, AdapterRegistry,
+        create_ev_charger_state_machine, create_battery_state_machine
+    )
+    print("Qubit Energy Coordinator installed successfully!")
+    ```
+  </Step>
+</Steps>
+
+## Quick Examples
+
+### Dispatch an EV Charging Schedule
+
+End-to-end: optimize with Layer 3, then dispatch with Layer 4.
+
+<CodeGroup>
+```python Full Pipeline
+from optimizer.ev.scheduler import EVChargingScheduler, ChargingSession
+from optimizer.base import OptimizationConfig
+from coordinator import (
+    DispatchEngine, EventBus, EventType,
+    OCPPAdapter, AdapterRegistry,
+    create_ev_charger_state_machine
+)
+from datetime import datetime, timezone
+
+# --- Layer 3: Optimize ---
+config = OptimizationConfig(horizon="24h", resolution="1h")
+scheduler = EVChargingScheduler(config=config, site_capacity_kw=200.0, charger_capacity_kw=22.0)
+
+sessions = [
+    ChargingSession(
+        vehicle_id="ev_001",
+        arrival_time=datetime(2025, 1, 15, 8, 0, tzinfo=timezone.utc),
+        departure_time=datetime(2025, 1, 15, 17, 0, tzinfo=timezone.utc),
+        energy_needed_kwh=30.0,
+        max_charge_rate_kw=22.0,
+    ),
+]
+
+tariff = {
+    "energy_rates": [
+        {"name": "off_peak", "rate": 0.08, "schedule": {"start_time": "00:00", "end_time": "06:59"}},
+        {"name": "peak", "rate": 0.25, "schedule": {"start_time": "07:00", "end_time": "22:59"}},
+        {"name": "off_peak_night", "rate": 0.08, "schedule": {"start_time": "23:00", "end_time": "23:59"}}
+    ]
+}
+
+result = scheduler.optimize(
+    sessions=sessions, tariff=tariff,
+    start_time=datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+)
+
+print(f"Optimization: {result.status}, cost=${result.total_cost:.2f}")
+
+# --- Layer 4: Coordinate ---
+bus = EventBus()
+registry = AdapterRegistry()
+registry.register("ast_ev_001", OCPPAdapter("ocpp_site"))
+
+engine = DispatchEngine(event_bus=bus, adapter_registry=registry)
+
+# Convert schedule to commands
+commands = engine.schedule_to_commands(
+    result.schedule,
+    asset_map={"ev_001": "ast_ev_001"}
+)
+print(f"Generated {len(commands)} commands")
+
+# Dispatch pending commands
+now = datetime(2025, 1, 15, 9, 0, tzinfo=timezone.utc)
+for cmd in engine.get_pending_commands(now):
+    adapter = registry.get(cmd.asset_id)
+    engine.dispatch_command(cmd, adapter)
+    print(f"  Dispatched: {cmd.command_type.value} → {cmd.asset_id} "
+          f"({cmd.parameters['power_kw']:.0f} kW)")
+```
+
+```python State Machine Integration
+# Track charger state alongside dispatch
+charger = create_ev_charger_state_machine("ast_ev_001", event_bus=bus)
+
+# Simulate vehicle arrival
+charger.trigger("plug_in")
+print(f"Charger state: {charger.current_state}")  # PREPARING
+
+charger.trigger("start_charge")
+print(f"Charger state: {charger.current_state}")  # CHARGING
+
+# Check valid actions
+print(f"Available triggers: {charger.available_triggers()}")
+# ["suspend", "complete", "unplug", "fault"]
+
+# Vehicle departs
+charger.trigger("complete")
+charger.trigger("unplug")
+print(f"Charger state: {charger.current_state}")  # AVAILABLE
+```
+
+```python Event Monitoring
+# Monitor all events
+def log_event(event):
+    print(f"[{event.event_type.value}] {event.payload}")
+
+bus.subscribe(EventType.COMMAND_DISPATCHED, log_event)
+bus.subscribe(EventType.COMMAND_COMPLETED, log_event)
+bus.subscribe(EventType.STATE_CHANGED, log_event)
+
+# Events fire automatically during dispatch and state transitions
+```
+</CodeGroup>
+
+### Battery Dispatch from Peak Shaving
+
+<CodeGroup>
+```python Battery Dispatch
+from optimizer.peak_shaving.controller import PeakShavingController, BatterySpec
+from optimizer.base import OptimizationConfig
+from coordinator import (
+    DispatchEngine, EventBus,
+    ModbusAdapter, AdapterRegistry,
+    create_battery_state_machine
+)
+from datetime import datetime, timezone
+import numpy as np
+
+# --- Layer 3: Optimize ---
+config = OptimizationConfig(horizon="24h", resolution="1h")
+controller = PeakShavingController(config=config, peak_target_kw=150.0)
+
+battery_spec = BatterySpec(
+    asset_id="ast_batt_001",
+    capacity_kwh=200.0,
+    max_charge_kw=50.0,
+    max_discharge_kw=50.0,
+)
+
+hours = np.arange(24)
+load = 80 + 100 * np.exp(-((hours - 9) ** 2) / 4) + 120 * np.exp(-((hours - 18) ** 2) / 4)
+
+result = controller.optimize(
+    battery=battery_spec, load_forecast=load,
+    start_time=datetime(2025, 1, 15, 0, 0, tzinfo=timezone.utc)
+)
+
+print(f"Peak before: {load.max():.0f} kW → after: {result.peak_demand_kw:.0f} kW")
+
+# --- Layer 4: Coordinate ---
+bus = EventBus()
+registry = AdapterRegistry()
+registry.register("ast_batt_001", ModbusAdapter("modbus_bms"))
+
+engine = DispatchEngine(event_bus=bus, adapter_registry=registry)
+
+commands = engine.schedule_to_commands(
+    result.schedule,
+    asset_map={"battery": "ast_batt_001"}
+)
+
+print(f"\nGenerated {len(commands)} battery commands:")
+for cmd in commands:
+    print(f"  {cmd.scheduled_at.strftime('%H:%M')} | "
+          f"{cmd.command_type.value} | {cmd.parameters['power_kw']:.1f} kW")
+```
+</CodeGroup>
+
+## Configuration Reference
+
+### CoordinatorConfig
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `site_id` | required | Qubit site identifier (`sit_*`) |
+| `dispatch_interval_seconds` | `5.0` | Seconds between dispatch cycles |
+| `command_timeout_seconds` | `30.0` | Default command timeout |
+| `max_retries` | `3` | Max retries for failed commands |
+| `retry_backoff_factor` | `2.0` | Exponential backoff multiplier |
+| `stale_state_seconds` | `60.0` | Asset state staleness threshold |
+
+### Command Defaults
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `max_retries` | `3` | Retries before marking FAILED |
+| `timeout_seconds` | `30.0` | Seconds before TIMED_OUT |
+| `priority` | `1` | 1=normal, higher=more urgent |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dispatch Engine" icon="paper-plane" href="/layer-4/dispatch">
+    Deep dive into command lifecycle and change detection
+  </Card>
+  <Card title="State Machines" icon="diagram-project" href="/layer-4/state-machines">
+    EV charger and battery state machine details
+  </Card>
+  <Card title="Protocol Adapters" icon="plug" href="/layer-4/protocol-adapters">
+    OCPP, Modbus, and writing custom adapters
+  </Card>
+  <Card title="Layer 3 Optimization" icon="bolt" href="/layer-3/getting-started">
+    Generate the schedules that Layer 4 dispatches
+  </Card>
+</CardGroup>
+
+---
+
+*You're now ready to dispatch optimization schedules to real energy assets! Layer 4 coordinates the execution of Layer 3's intelligence.*

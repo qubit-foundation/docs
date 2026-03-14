@@ -86,7 +86,11 @@
     {
       "group": "Layer 4: Coordination",
       "pages": [
-        "layer-4/overview"
+        "layer-4/overview",
+        "layer-4/dispatch",
+        "layer-4/state-machines",
+        "layer-4/protocol-adapters",
+        "layer-4/getting-started"
       ]
     },
     {

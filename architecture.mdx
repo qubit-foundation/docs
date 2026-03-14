@@ -49,16 +49,16 @@ The Qubit Foundation employs a comprehensive six-layer architecture designed to 
   </Step>
   
   <Step title="Layer 4: Coordination Layer">
-    **Distributed System Orchestration**
-    
-    Real-time coordination protocols that enable large-scale distributed energy resource management.
-    
-    - Peer-to-peer energy trading protocols
-    - Virtual power plant coordination
-    - Grid services aggregation
-    - Multi-stakeholder consensus mechanisms
-    
-    *Status: Research Phase*
+    **Command Dispatch and Asset Orchestration**
+
+    Converts Layer 3 optimization schedules into real-time device commands with protocol translation and state management.
+
+    - Dispatch engine converting schedules to timed commands with lifecycle tracking
+    - OCPP-aligned EV charger and battery state machines
+    - Protocol adapters for OCPP (EV chargers) and Modbus (batteries)
+    - Typed event bus for real-time coordination across components
+
+    *Status: In Production*
   </Step>
   
   <Step title="Layer 5: Settlement Layer">
